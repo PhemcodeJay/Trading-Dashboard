@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
+import { useToast } from '@/hooks/use-toast';
 
 interface TradingPanelProps {
   selectedPair: string;
@@ -20,6 +20,54 @@ export const TradingPanel = ({ selectedPair, setSelectedPair, orderType, setOrde
   const [takeProfit, setTakeProfit] = useState('5');
   const [stopLoss, setStopLoss] = useState('2');
   const [autoTrading, setAutoTrading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const API_BASE = 'http://localhost:5000/api';
+
+  const executeTrade = async (action: 'buy' | 'sell') => {
+    setLoading(true);
+    try {
+      const tradeData = {
+        symbol: selectedPair,
+        action: action.toUpperCase(),
+        size: parseFloat(size),
+        leverage: parseInt(leverage.replace('x', '')),
+        take_profit: parseFloat(takeProfit),
+        stop_loss: parseFloat(stopLoss),
+        entry: 50985, // Mock entry price - would be current market price
+        timestamp: new Date().toISOString(),
+        mode: autoTrading ? 'auto' : 'manual'
+      };
+
+      const response = await fetch(`${API_BASE}/trade`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(tradeData),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        toast({
+          title: "Trade Executed",
+          description: `${action.toUpperCase()} order for ${selectedPair} has been placed`,
+        });
+      } else {
+        throw new Error('Trade failed');
+      }
+    } catch (error) {
+      console.error('Trade execution error:', error);
+      toast({
+        title: "Trade Failed",
+        description: "Failed to execute trade. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <Card className="bg-gray-800 border-gray-700">
@@ -32,9 +80,9 @@ export const TradingPanel = ({ selectedPair, setSelectedPair, orderType, setOrde
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-gray-700 border-gray-600">
-              <SelectItem value="BTC/USDT">BTC/USDT</SelectItem>
-              <SelectItem value="ETH/USDT">ETH/USDT</SelectItem>
-              <SelectItem value="BNB/USDT">BNB/USDT</SelectItem>
+              <SelectItem value="BTCUSDT">BTC/USDT</SelectItem>
+              <SelectItem value="ETHUSDT">ETH/USDT</SelectItem>
+              <SelectItem value="BNBUSDT">BNB/USDT</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -119,14 +167,22 @@ export const TradingPanel = ({ selectedPair, setSelectedPair, orderType, setOrde
               </div>
             </div>
 
-            <Button className="w-full bg-green-600 hover:bg-green-700 text-white">
-              Buy BTC
+            <Button 
+              className="w-full bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => executeTrade('buy')}
+              disabled={loading}
+            >
+              {loading ? 'Executing...' : 'Buy BTC'}
             </Button>
           </TabsContent>
           
           <TabsContent value="sell" className="space-y-4 mt-4">
-            <Button className="w-full bg-red-600 hover:bg-red-700 text-white">
-              Sell BTC
+            <Button 
+              className="w-full bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => executeTrade('sell')}
+              disabled={loading}
+            >
+              {loading ? 'Executing...' : 'Sell BTC'}
             </Button>
           </TabsContent>
         </Tabs>
